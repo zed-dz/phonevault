@@ -1,0 +1,657 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<title>PhoneVault</title>
+<style>
+  :root {
+    --bg: #0d0f12; --panel: #15181d; --panel-2: #1b1f25; --line: #262b33; --line-2: #313742;
+    --text: #e6e9ee; --muted: #8b93a1; --dim: #5d6572;
+    --accent: #7cc4ff; --accent-2: #4ea1e8; --ok: #5ed39a; --dup: #e0b95a; --bad: #ff7b7b; --warn: #f0a35b;
+    --radius: 14px; --gap: 14px;
+    font-size: 16px;
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  #mapTbl input { min-width: 240px; }
+  @media (max-width: 639px) { #mapTbl thead { display: none; } #mapTbl tr, #mapTbl td { display: block; } #mapTbl input { min-width: 0; } #mapTbl td:first-child { border-bottom: 0; padding-bottom: 0; } }
+  html, body { margin: 0; background: var(--bg); color: var(--text);
+    font-family: -apple-system, "Segoe UI", system-ui, Roboto, "Helvetica Neue", Arial, sans-serif;
+    -webkit-text-size-adjust: 100%; }
+  body { padding: calc(10px + env(safe-area-inset-top, 0px)) 16px calc(28px + env(safe-area-inset-bottom, 0px)); }
+  .wrap { max-width: 1040px; margin: 0 auto; display: grid; gap: var(--gap); min-width: 0; }
+  .wrap > * { min-width: 0; }
+  a { color: var(--accent); }
+  h1 { font-size: 1.35rem; margin: 0; letter-spacing: .01em; font-weight: 650; }
+  h2 { font-size: .8rem; margin: 0 0 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .09em; font-weight: 600; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; }
+  .mono { font-family: ui-monospace, Consolas, "SF Mono", Menlo, monospace; font-size: .86em; word-break: break-all; }
+  .muted { color: var(--muted); } .dim { color: var(--dim); } .small { font-size: .82rem; }
+
+  /* header */
+  header { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center; justify-content: space-between; padding: 6px 2px; }
+  .brand { display: flex; align-items: center; gap: 10px; }
+  .logo { width: 28px; height: 28px; border-radius: 8px; background: linear-gradient(145deg, var(--accent), #3b6fd8); position: relative; }
+  .logo::after { content: ""; position: absolute; inset: 7px 9px; border: 2px solid #0d0f12; border-radius: 4px; }
+  .pill { display: inline-flex; align-items: center; gap: 8px; min-height: 36px; padding: 6px 12px; border-radius: 999px;
+    border: 1px solid var(--line-2); background: var(--panel-2); font-size: .86rem; white-space: nowrap; max-width: 100%; }
+  .pill span:last-child { overflow: hidden; text-overflow: ellipsis; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--dim); flex: none; }
+  .pill.on .dot { background: var(--ok); box-shadow: 0 0 8px var(--ok); }
+  .pill.warn .dot { background: var(--warn); }
+  .path { width: 100%; font-size: .8rem; color: var(--muted); }
+
+  /* buttons */
+  button { font: inherit; color: var(--text); background: var(--panel-2); border: 1px solid var(--line-2); border-radius: 12px;
+    min-height: 44px; padding: 10px 14px; cursor: pointer; transition: background .15s, border-color .15s, opacity .15s; }
+  button:hover { border-color: var(--accent-2); }
+  button:disabled { opacity: .4; cursor: not-allowed; }
+  button.primary { background: linear-gradient(180deg, #3f8fe0, #2f6fc0); border-color: #4a8fd8; font-weight: 600; }
+  button.danger { border-color: #6b3a3a; color: var(--bad); }
+  button.sm { min-height: 44px; padding: 6px 14px; font-size: .84rem; border-radius: 10px; }
+  .actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  @media (min-width: 640px) { .actions { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+  @media (min-width: 900px) { .actions { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
+  .actions button { min-height: 54px; min-width: 0; white-space: normal; padding: 8px 10px; }
+  .actions button b { display: block; font-weight: 600; }
+  .actions button small { color: var(--muted); font-weight: 400; }
+  .actions button.primary small { color: #e3efff; }
+  .toolbar { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; margin-top: 12px; }
+  .switch { display: inline-flex; align-items: center; gap: 10px; min-height: 44px; cursor: pointer; user-select: none; }
+  .switch input { appearance: none; flex: none; width: 46px; height: 26px; border-radius: 999px; background: var(--line-2); position: relative; margin: 0; cursor: pointer; }
+  .switch input::after { content: ""; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #cfd5de; transition: transform .15s; }
+  .switch input:checked { background: var(--accent-2); }
+  .switch input:checked::after { transform: translateX(20px); }
+  select, input[type=text], input[type=number] { font: inherit; color: var(--text); background: var(--panel-2); border: 1px solid var(--line-2);
+    border-radius: 10px; min-height: 44px; padding: 8px 12px; width: 100%; }
+  select { width: auto; }
+  .running-ctl { display: none; gap: 10px; }
+  .running .running-ctl { display: flex; }
+
+  /* progress */
+  .phase { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 12px; margin-bottom: 10px; }
+  .phase b { font-size: 1.15rem; text-transform: capitalize; }
+  .bar { height: 14px; border-radius: 999px; background: var(--line); overflow: hidden; }
+  .bar > i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--accent-2), var(--accent)); transition: width .3s; }
+  .bar.thin { height: 5px; margin-top: 6px; } .bar.thin > i { background: var(--ok); }
+  .bar.failed > i { background: var(--bad); } .bar.paused > i { opacity: .5; }
+  .stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 14px; }
+  @media (min-width: 640px) { .stats { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
+  .stat { background: var(--panel-2); border-radius: 10px; padding: 8px 10px; min-width: 0; overflow-wrap: anywhere; }
+  .stat small { display: block; color: var(--muted); font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; }
+  .stat span { font-size: 1.05rem; font-weight: 600; }
+  .cur { margin-top: 12px; font-size: .86rem; display: grid; gap: 3px; }
+  .cur .mono { color: var(--text); }
+
+  /* tables */
+  .tbl { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  table { width: 100%; border-collapse: collapse; font-size: .86rem; }
+  th, td { text-align: left; padding: 9px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; font-size: .74rem; text-transform: uppercase; letter-spacing: .06em; white-space: nowrap; cursor: pointer; user-select: none; }
+  th.sorted::after { content: " ▾"; color: var(--accent); } th.sorted.asc::after { content: " ▴"; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  tr:last-child td { border-bottom: 0; }
+  .empty { color: var(--dim); padding: 10px 0; font-size: .9rem; }
+
+  /* feed */
+  .feed { display: grid; gap: 4px; max-height: 360px; overflow-y: auto; font-size: .84rem; }
+  .line { display: grid; grid-template-columns: 62px minmax(0, 1fr); gap: 8px; padding: 5px 8px; border-radius: 8px; background: var(--panel-2); min-width: 0; }
+  .line time { color: var(--dim); font-variant-numeric: tabular-nums; }
+  .line.ok { border-left: 3px solid var(--ok); } .line.dup { border-left: 3px solid var(--dup); }
+  .line.failed, .line.error { border-left: 3px solid var(--bad); } .line.warn { border-left: 3px solid var(--warn); }
+  .line.info { border-left: 3px solid var(--line-2); }
+
+  /* runs */
+  .run { display: grid; gap: 6px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+  .run:last-child { border-bottom: 0; }
+  .run-top { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; }
+  .run-top .mono { color: var(--muted); }
+  .tag { padding: 2px 8px; border-radius: 6px; font-size: .74rem; background: var(--panel-2); border: 1px solid var(--line-2); text-transform: uppercase; letter-spacing: .05em; }
+  .tag.done { color: var(--ok); } .tag.failed { color: var(--bad); } .tag.cancelled { color: var(--warn); } .tag.running { color: var(--accent); }
+  .run-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+  .ops { display: grid; gap: 3px; font-size: .78rem; max-height: 260px; overflow-y: auto; padding: 6px 0; }
+
+  details summary { cursor: pointer; list-style: none; min-height: 44px; display: flex; align-items: center; justify-content: space-between; }
+  details summary::-webkit-details-marker { display: none; }
+  details summary::after { content: "+"; color: var(--muted); font-size: 1.3rem; } details[open] summary::after { content: "–"; }
+  .form { display: grid; gap: 12px; margin-top: 10px; }
+  .form label { display: grid; gap: 5px; font-size: .84rem; color: var(--muted); }
+  .form .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .toast { position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: #22262e;
+    border: 1px solid var(--line-2); color: var(--text); padding: 10px 16px; border-radius: 12px; font-size: .88rem; opacity: 0; pointer-events: none; transition: opacity .2s; max-width: 92vw; }
+  .toast.show { opacity: 1; pointer-events: auto; }
+  .toast button { margin-left: 10px; min-height: 44px; vertical-align: middle; }
+  .err { color: var(--bad); }
+
+  /* review new albums */
+  .badge { display: inline-flex; align-items: center; justify-content: center; min-width: 24px; height: 24px; padding: 0 8px; margin-left: 10px;
+    border-radius: 999px; background: var(--accent-2); color: #fff; font-size: .76rem; font-weight: 700; letter-spacing: 0; text-transform: none; }
+  .badge.zero { background: var(--line-2); color: var(--muted); }
+  .rv-list { display: grid; gap: 14px; margin-top: 12px; }
+  .rv-album { background: var(--panel-2); border: 1px solid var(--line); border-radius: 12px; padding: 12px; display: grid; gap: 10px; min-width: 0; }
+  .rv-head { display: flex; flex-wrap: wrap; gap: 2px 12px; align-items: baseline; }
+  .rv-head b { font-size: 1.02rem; overflow-wrap: anywhere; }
+  .rv-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+  @media (min-width: 640px) { .rv-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
+  .rv-th { position: relative; padding: 0; min-height: 44px; aspect-ratio: 1; border-radius: 8px; overflow: hidden; background: var(--bg); border: 2px solid transparent; }
+  .rv-th img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .rv-th .play { position: absolute; right: 6px; bottom: 6px; width: 24px; height: 24px; border-radius: 50%; background: rgba(0,0,0,.65); }
+  .rv-th .play::after { content: ""; position: absolute; left: 9px; top: 6px; border-left: 10px solid #fff; border-top: 6px solid transparent; border-bottom: 6px solid transparent; }
+  .rv-album.selecting .rv-th::before { content: ""; position: absolute; top: 6px; left: 6px; width: 22px; height: 22px; border-radius: 50%; z-index: 1;
+    border: 2px solid #fff; background: rgba(0,0,0,.45); }
+  .rv-th.sel { border-color: var(--accent); }
+  .rv-th.sel::before { background: var(--accent) !important; border-color: var(--accent) !important; }
+  .rv-th.sel::after { content: "✓"; position: absolute; top: 6px; left: 6px; width: 22px; height: 22px; line-height: 22px; text-align: center; z-index: 2;
+    color: #0d0f12; font-weight: 800; font-size: .8rem; }
+  .rv-album:not(.selecting) .only-sel, .rv-album.selecting .only-norm { display: none !important; }
+  .rv-form { display: grid; gap: 8px; grid-template-columns: minmax(0, 1fr); }
+  @media (min-width: 640px) { .rv-form { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } .rv-form .rv-btns { grid-column: 1 / -1; } }
+  .rv-form select { width: 100%; }
+  .rv-btns { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; }
+  .rv-btns button { flex: 1 1 auto; }
+  .rv-btns .switch { flex: 1 1 100%; }
+  @media (min-width: 640px) { .rv-btns .switch { flex: 0 0 auto; margin-right: auto; } .rv-btns button { flex: 0 0 auto; } }
+  .rv-hint { font-size: .82rem; color: var(--muted); margin-top: 8px; }
+
+  /* lightbox */
+  .lb { position: fixed; inset: 0; background: rgba(5, 6, 8, .94); z-index: 50; display: flex; flex-direction: column; }
+  .lb-top { display: flex; align-items: center; gap: 10px; padding: calc(8px + env(safe-area-inset-top, 0px)) 12px 8px; }
+  .lb-top .mono { flex: 1; min-width: 0; font-size: .8rem; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .lb-stage { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; padding: 0 8px; }
+  .lb-stage img, .lb-stage video { max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 6px; background: #000; }
+  .lb-nav { display: flex; gap: 10px; padding: 10px 12px calc(14px + env(safe-area-inset-bottom, 0px)); }
+  .lb-nav button { flex: 1; }
+</style>
+</head>
+<body>
+<div class="wrap" id="app">
+  <header>
+    <div class="brand"><div class="logo"></div><h1>PhoneVault</h1></div>
+    <div class="pill warn" id="demoPill" hidden><span class="dot"></span><span>Demo: sample phone, nothing real is touched</span></div>
+    <div class="pill" id="linkPill"><span class="dot"></span><span id="linkText">checking link…</span></div>
+    <div class="path mono" id="pcRoot"></div>
+  </header>
+
+  <section class="card" id="actionsCard">
+    <h2>Actions</h2>
+    <div class="actions">
+      <button data-kind="scan"><b>Scan</b><small>look, copy nothing</small></button>
+      <button data-kind="sync" class="primary"><b>Sync gallery</b><small>photos + videos</small></button>
+      <button data-kind="all"><b>Sync everything</b><small>media, files, apps…</small></button>
+      <button data-kind="apps"><b>Apps</b><small>APK installers</small></button>
+      <button data-kind="appdata"><b>App data</b><small>one tap on the phone</small></button>
+      <button data-kind="extdata"><b>App folders</b><small>chat backups, app files</small></button>
+      <button data-kind="dedupe"><b>Dedupe</b><small>new albums vs the library</small></button>
+      <button data-kind="restore-all" class="danger"><b>Set up a new phone</b><small>restore everything to the phone on the cable</small></button>
+      <button data-kind="settings"><b>Settings</b><small>phone settings</small></button>
+      <button data-kind="pim"><b>Contacts + SMS</b><small>and call log</small></button>
+    </div>
+    <div class="toolbar">
+      <label class="switch"><input type="checkbox" id="dryRun"><span>Dry run (plan only, write nothing)</span></label>
+      <label class="switch"><span class="muted small">Link</span>
+        <select id="linkSel"><option value="auto">auto</option><option value="adb">adb</option><option value="mtp">MTP</option></select></label>
+      <div class="running-ctl">
+        <button id="pauseBtn">Pause</button>
+        <button id="stopBtn" class="danger">Stop</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="card" id="progressCard">
+    <h2>Progress</h2>
+    <div class="phase"><b id="phase">idle</b><span class="muted" id="kind"></span><span class="muted" id="transport"></span></div>
+    <div class="muted small" id="message" style="margin-bottom:10px"></div>
+    <div class="bar" id="barFiles"><i></i></div>
+    <div class="bar thin" id="barBytes"><i></i></div>
+    <div class="stats">
+      <div class="stat"><small>files</small><span id="sFiles">0 / 0</span></div>
+      <div class="stat"><small>data</small><span id="sBytes">0 B</span></div>
+      <div class="stat"><small>speed</small><span id="sSpeed">—</span></div>
+      <div class="stat"><small>time left</small><span id="sEta">—</span></div>
+      <div class="stat"><small>copied</small><span id="sCopied" style="color:var(--ok)">0</span></div>
+      <div class="stat"><small>dup / failed</small><span><span id="sDups" style="color:var(--dup)">0</span> / <span id="sFailed" style="color:var(--bad)">0</span></span></div>
+    </div>
+    <div class="cur" id="cur" hidden>
+      <div><span class="muted">File</span> <span class="mono" id="curFile"></span></div>
+      <div><span class="muted">Album</span> <span id="curAlbum"></span></div>
+      <div><span class="muted">To</span> <span class="mono" id="curDst"></span></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Albums in this run</h2>
+    <div class="tbl"><table id="albumsTbl">
+      <thead><tr>
+        <th data-k="album">Album</th><th class="num" data-k="planned">Planned</th><th class="num" data-k="copied">Copied</th>
+        <th class="num" data-k="dups">Dups</th><th class="num" data-k="failed">Failed</th><th class="num" data-k="bytes">Size</th>
+      </tr></thead><tbody></tbody></table></div>
+    <div class="empty" id="albumsEmpty">No albums yet. Press Scan to see what is new on the phone.</div>
+  </section>
+
+  <section class="card" id="reviewCard">
+    <details id="health">
+      <summary><h2 style="margin:0">Backup health <span class="badge" id="hlBadge">?</span></h2></summary>
+      <div id="healthRows" class="muted small">Loading…</div>
+    </details>
+    <details id="review">
+      <summary><h2 style="margin:0">Review new albums <span class="badge zero" id="rvBadge">0</span></h2></summary>
+      <div class="rv-hint">Albums the phone sent that had no folder on the PC yet. Look through them, then file each one into one of your folders. Every move can be undone from Run history.</div>
+      <div class="rv-list" id="rvList"></div>
+      <div class="empty" id="rvEmpty">Nothing to review. New albums show up here after a sync.</div>
+    </details>
+  </section>
+
+  <section class="card">
+    <h2>Activity</h2>
+    <div class="feed" id="feed"></div>
+    <div class="empty" id="feedEmpty">Nothing happened yet.</div>
+  </section>
+
+  <section class="card">
+    <h2>Run history</h2>
+    <div id="runs"></div>
+    <div class="empty" id="runsEmpty">No runs yet.</div>
+  </section>
+
+  <section class="card">
+    <h2>Album mapping <span class="dim" style="text-transform:none;letter-spacing:0">phone album → PC folder, saved when you leave the box</span></h2>
+    <datalist id="pcFolders"></datalist>
+    <div class="tbl"><table id="mapTbl"><thead><tr><th>Phone album</th><th>PC folder</th></tr></thead><tbody></tbody></table></div>
+    <div class="empty" id="mapEmpty">No mappings saved yet. They appear after the first scan.</div>
+  </section>
+
+  <section class="card">
+    <details id="settings">
+      <summary><h2 style="margin:0">Settings</h2></summary>
+      <div class="form">
+        <label>PC folder (where the phone is backed up)<input type="text" id="cfg_pc_root" class="mono" autocomplete="off"></label>
+        <label>Wi-Fi address (ip:port, set by <span class="mono">phonevault wifi</span>)<input type="text" id="cfg_wifi_address" class="mono" placeholder="192.168.1.20:5555"></label>
+        <label>Dashboard port (takes effect next start)<input type="number" id="cfg_dashboard_port" min="1" max="65535"></label>
+        <div class="row"><button class="primary" id="saveCfg">Save settings</button><button class="sm" id="trashBtn">Show trash folder</button><span class="small muted" id="cfgMsg"></span></div>
+        <div id="trashBox" hidden><div class="small muted mono" id="trashDir"></div><div class="ops" id="trashList"></div></div>
+      </div>
+    </details>
+  </section>
+</div>
+<div class="toast" id="toast"></div>
+<div class="lb" id="lb" hidden role="dialog" aria-label="Preview">
+  <div class="lb-top"><span class="mono" id="lbName"></span><span class="small muted" id="lbCount"></span><button class="sm" id="lbClose">Close</button></div>
+  <div class="lb-stage" id="lbStage"></div>
+  <div class="lb-nav"><button id="lbPrev">‹ Previous</button><button id="lbNext">Next ›</button></div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  var S = { state: {}, link: {}, config: {}, runs: [], busy: false, feed: [], sortKey: "planned", sortAsc: false };
+  var RUNNING = { indexing: 1, scanning: 1, planning: 1, copying: 1, undoing: 1 };
+  var $ = function (id) { return document.getElementById(id); };
+
+  // ---- helpers ------------------------------------------------------------
+  function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+    return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
+  function num(v) { v = Number(v); return isFinite(v) ? v : 0; }
+  function fmtBytes(b) { b = num(b); if (b < 1024) return b + " B"; if (b < 1048576) return (b / 1024).toFixed(0) + " KB";
+    if (b < 1073741824) return (b / 1048576).toFixed(1) + " MB"; return (b / 1073741824).toFixed(2) + " GB"; }
+  function fmtDur(s) { if (s == null || !isFinite(s)) return "—"; s = Math.max(0, Math.round(s)); var m = Math.floor(s / 60), r = s % 60;
+    if (m >= 60) return Math.floor(m / 60) + " h " + (m % 60) + " min"; return (m < 10 ? "0" : "") + m + ":" + (r < 10 ? "0" : "") + r; }
+  function fmtWhen(t) { if (!t) return ""; var d = new Date(num(t) * 1000); return d.toLocaleDateString() + " " + d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }); }
+  function fmtClock(t) { var d = t ? new Date(num(t) * 1000) : new Date(); return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23" }); }
+  function isRunning() { return S.busy || !!RUNNING[S.state.phase]; }
+  var toastT; function toast(msg, bad, undoId) { var t = $("toast"); t.textContent = msg; t.style.color = bad ? "var(--bad)" : "";
+    if (undoId) { var b = document.createElement("button"); b.className = "sm"; b.textContent = "Undo"; b.dataset.undoToast = undoId; t.appendChild(b); }
+    t.classList.add("show"); clearTimeout(toastT); toastT = setTimeout(function () { t.classList.remove("show"); }, undoId ? 9000 : 3200); }
+  $("toast").addEventListener("click", function (ev) {
+    var b = ev.target.closest("button[data-undo-toast]"); if (!b) return;
+    b.disabled = true;
+    api("POST", "/api/undo/" + encodeURIComponent(b.dataset.undoToast)).then(function () { toast("Undoing… the album goes back to " + (RV.newFolder || "_New from phone")); })
+      .catch(function (e) { toast(e.message, true); });
+  });
+  function api(method, url, body) {
+    return fetch(url, { method: method, headers: { "Content-Type": "application/json" }, body: body ? JSON.stringify(body) : undefined })
+      .then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { if (!r.ok) throw new Error(j.detail || ("HTTP " + r.status)); return j; }); });
+  }
+
+  // ---- state ---------------------------------------------------------------
+  function mergeState(d) {
+    Object.keys(d).forEach(function (k) { if (k !== "type" && k !== "t" && k !== "log" && k !== "link" && k !== "config" && k !== "runs") S.state[k] = d[k]; });
+    if (typeof d.busy === "boolean") S.busy = d.busy;
+  }
+  function loadState() {
+    return api("GET", "/api/state").then(function (d) {
+      mergeState(d); S.link = d.link || {}; S.config = d.config || {}; S.runs = d.runs || []; S.trashDir = d.trash_dir || ""; $("demoPill").hidden = !d.demo;
+      if (Array.isArray(d.log) && !S.feed.length) d.log.slice().reverse().forEach(function (e) { pushFeed(e, true); });
+      render(); renderRuns(); fillSettings();
+    });
+  }
+
+  // ---- render --------------------------------------------------------------
+  function render() {
+    var s = S.state, running = isRunning();
+    document.body.classList.toggle("running", running);
+    var l = S.link || {}, pill = $("linkPill"), txt;
+    if (l.adb) { txt = l.adb_desc || "adb"; pill.className = "pill on"; }
+    else if (l.adb_unauthorized) { txt = "phone says: tap Allow"; pill.className = "pill warn"; }
+    else if (l.mtp) { txt = l.mtp_desc || "MTP"; pill.className = "pill on"; }
+    else { txt = "no phone"; pill.className = "pill"; }
+    $("linkText").textContent = txt;
+    $("pcRoot").textContent = S.config.pc_root || "";
+
+    document.querySelectorAll(".actions button").forEach(function (b) { b.disabled = running; });
+    $("pauseBtn").textContent = s.paused ? "Resume" : "Pause";
+    $("pauseBtn").disabled = s.phase !== "copying";
+
+    $("phase").textContent = s.phase || "idle";
+    $("kind").textContent = s.kind ? "· " + s.kind : "";
+    $("transport").textContent = s.transport ? "· " + s.transport : "";
+    $("message").textContent = s.message || "";
+    var tf = num(s.total_files), df = num(s.done_files), tb = num(s.total_bytes), db = num(s.done_bytes) + num(s.file_done_bytes);
+    var pf = tf ? Math.min(100, df / tf * 100) : (s.phase === "done" ? 100 : 0);
+    var pb = tb ? Math.min(100, db / tb * 100) : 0;
+    $("barFiles").firstElementChild.style.width = pf + "%";
+    $("barBytes").firstElementChild.style.width = pb + "%";
+    $("barFiles").className = "bar" + (s.phase === "failed" ? " failed" : "") + (s.paused ? " paused" : "");
+    $("sFiles").textContent = df + " / " + tf;
+    $("sBytes").textContent = fmtBytes(Math.min(db, tb || db)) + (tb ? " of " + fmtBytes(tb) : "");
+    var sp = num(s.speed_bps);
+    $("sSpeed").textContent = running && sp > 0 ? (sp / 1048576).toFixed(1) + " MB/s" : "—";
+    $("sEta").textContent = running ? fmtDur(s.eta_s) : "—";
+    var copied = Math.max(0, df - num(s.dups) - num(s.failed));
+    $("sCopied").textContent = copied; $("sDups").textContent = num(s.dups); $("sFailed").textContent = num(s.failed);
+    var cur = s.current || "";
+    $("cur").hidden = !cur;
+    $("curFile").textContent = cur; $("curAlbum").textContent = s.current_album || "—"; $("curDst").textContent = s.current_dst || "—";
+    renderAlbums();
+    renderFeed();
+  }
+
+  function renderAlbums() {
+    var a = S.state.albums || {}, rows = Object.keys(a).map(function (k) { var v = a[k] || {}; return { album: k, planned: num(v.planned), copied: num(v.copied), dups: num(v.dups), failed: num(v.failed), bytes: num(v.bytes) }; });
+    var k = S.sortKey, asc = S.sortAsc;
+    rows.sort(function (x, y) { var c = (k === "album") ? String(x.album).localeCompare(String(y.album)) : (x[k] - y[k]); return asc ? c : -c; });
+    $("albumsTbl").querySelector("tbody").innerHTML = rows.map(function (r) {
+      return "<tr><td>" + esc(r.album) + "</td><td class=num>" + r.planned + "</td><td class=num style='color:var(--ok)'>" + r.copied +
+        "</td><td class=num style='color:var(--dup)'>" + r.dups + "</td><td class=num style='color:var(--bad)'>" + r.failed + "</td><td class=num>" + fmtBytes(r.bytes) + "</td></tr>";
+    }).join("");
+    document.querySelectorAll("#albumsTbl th").forEach(function (th) { th.className = (th.dataset.k === k ? "sorted" + (asc ? " asc" : "") : "") + (th.classList.contains("num") ? " num" : ""); });
+    $("albumsEmpty").hidden = rows.length > 0;
+  }
+  document.querySelectorAll("#albumsTbl th").forEach(function (th) { th.addEventListener("click", function () {
+    if (S.sortKey === th.dataset.k) S.sortAsc = !S.sortAsc; else { S.sortKey = th.dataset.k; S.sortAsc = th.dataset.k === "album"; } renderAlbums(); }); });
+
+  function pushFeed(e, silent) {
+    var cls = "info", text = "";
+    if (e.type === "file_done") { cls = e.status === "dup" ? "dup" : "ok"; text = (e.status === "dup" ? "duplicate " : "copied ") + (e.path || "") + (e.dst ? " → " + e.dst : ""); }
+    else if (e.type === "file_failed") { cls = "failed"; text = "failed " + (e.path || "") + ": " + (e.error || ""); }
+    else if (e.type === "log") { cls = e.level === "error" ? "error" : e.level === "warn" ? "warn" : "info"; text = e.text || ""; }
+    else if (e.type === "run_start") { cls = "info"; text = "run " + (e.run_id || "") + " started: " + (e.files || 0) + " files (" + (e.kind || "") + ")"; }
+    else if (e.type === "run_done") { cls = e.status === "done" ? "ok" : e.status === "failed" ? "failed" : "warn"; text = "run " + (e.run_id || "") + " " + (e.status || "") +
+      (e.copied != null ? ": " + e.copied + " copied, " + (e.dups || 0) + " duplicates, " + (e.failed || 0) + " failed" : ""); }
+    else if (e.type === "warn") { cls = "warn"; text = e.text || JSON.stringify(e); }
+    else return;
+    S.feed.unshift({ cls: cls, text: text, t: e.t });
+    if (S.feed.length > 60) S.feed.length = 60;
+    if (!silent) renderFeed();
+  }
+  function renderFeed() {
+    $("feed").innerHTML = S.feed.map(function (f) { return "<div class='line " + f.cls + "'><time>" + esc(fmtClock(f.t)) + "</time><span class=mono>" + esc(f.text) + "</span></div>"; }).join("");
+    $("feedEmpty").hidden = S.feed.length > 0;
+  }
+
+  // ---- runs ----------------------------------------------------------------
+  function renderRuns() {
+    var runs = S.runs || [];
+    $("runs").innerHTML = runs.map(function (r) {
+      var st = r.status || "", isUndo = r.kind === "undo", canUndo = !r.undone && r.kind !== "restore" && st !== "running" && (isUndo || num(r.files) > 0);
+      return "<div class=run data-id='" + esc(r.id) + "'><div class=run-top><span class=mono>" + esc(r.id) + "</span><span class='small muted'>" + esc(fmtWhen(r.started)) +
+        "</span><span class=tag>" + esc(r.kind) + "</span><span class='tag " + esc(st) + "'>" + esc(st) + "</span>" + (r.undone ? "<span class='tag'>undone</span>" : "") +
+        "<span class=small>" + num(r.files) + " files · " + fmtBytes(r.bytes) + "</span>" + (r.note ? "<span class='small dim'>" + esc(r.note) + "</span>" : "") +
+        "</div><div class=run-btns>" + (canUndo ? "<button class='sm danger' data-undo='" + esc(r.id) + "' data-label='" + (isUndo ? "Undo the undo" : "Undo") + "'>" + (isUndo ? "Undo the undo" : "Undo") + "</button>" : "") +
+        "<button class=sm data-show='" + esc(r.id) + "'>Show files</button></div><div class=ops hidden></div></div>";
+    }).join("");
+    $("runsEmpty").hidden = runs.length > 0;
+  }
+  $("runs").addEventListener("click", function (ev) {
+    var b = ev.target.closest("button"); if (!b) return;
+    if (b.dataset.undo) {
+      if (b.dataset.armed !== "1") { b.dataset.armed = "1"; b.textContent = "Really undo?"; setTimeout(function () { b.dataset.armed = ""; b.textContent = b.dataset.label; }, 5000); return; }
+      b.disabled = true;
+      api("POST", "/api/undo/" + encodeURIComponent(b.dataset.undo)).then(function () { toast(b.dataset.label === "Undo" ? "Undo started. Files go to the trash folder." : "Putting the files back."); })
+        .catch(function (e) { toast(e.message, true); b.disabled = false; b.textContent = b.dataset.label; });
+    } else if (b.dataset.show) {
+      var box = b.parentElement.nextElementSibling;
+      if (!box.hidden) { box.hidden = true; b.textContent = "Show files"; return; }
+      b.textContent = "Loading…";
+      api("GET", "/api/runs/" + encodeURIComponent(b.dataset.show)).then(function (ops) {
+        box.innerHTML = ops.length ? ops.map(function (o) { return "<div class='line " + (o.status === "ok" ? "ok" : o.status === "failed" ? "failed" : "dup") +
+          "'><span class=dim>" + esc(o.op) + "</span><span class=mono>" + esc(o.src || "") + " → " + esc(o.dst || "") + (o.note ? " <span class=dim>(" + esc(o.note) + ")</span>" : "") + "</span></div>"; }).join("")
+          : "<div class=empty>No files in this run.</div>";
+        box.hidden = false; b.textContent = "Hide files";
+      }).catch(function (e) { toast(e.message, true); b.textContent = "Show files"; });
+    }
+  });
+
+  // ---- album mapping -------------------------------------------------------
+  function loadMapping() {
+    return api("GET", "/api/albums").then(function (d) {
+      var folders = d.folders || [], saved = d.saved || {};
+      $("pcFolders").innerHTML = folders.slice(0, 2500).map(function (f) { return "<option value=\"" + esc(f) + "\"></option>"; }).join("");
+      var keys = Object.keys(saved).sort(function (a, b) { return a.localeCompare(b); });
+      $("mapTbl").querySelector("tbody").innerHTML = keys.map(function (k) {
+        return "<tr><td class=mono>" + esc(k) + "</td><td><input type=text class=mono list=pcFolders data-key=\"" + esc(k) + "\" value=\"" + esc(saved[k]) + "\" data-orig=\"" + esc(saved[k]) + "\"></td></tr>";
+      }).join("");
+      $("mapEmpty").hidden = keys.length > 0;
+    }).catch(function () {});
+  }
+  $("mapTbl").addEventListener("focusout", function (ev) {
+    var inp = ev.target; if (!inp.dataset || inp.dataset.key == null) return;
+    if (inp.value === inp.dataset.orig) return;
+    api("PUT", "/api/albums", { key: inp.dataset.key, pc_folder: inp.value }).then(function () { inp.dataset.orig = inp.value; toast("Mapping saved"); })
+      .catch(function (e) { toast(e.message, true); });
+  });
+
+  // ---- settings ------------------------------------------------------------
+  function fillSettings() {
+    ["pc_root", "wifi_address", "dashboard_port"].forEach(function (k) { var el = $("cfg_" + k); if (el && document.activeElement !== el && S.config[k] != null) el.value = S.config[k]; });
+  }
+  $("saveCfg").addEventListener("click", function () {
+    var body = { pc_root: $("cfg_pc_root").value, wifi_address: $("cfg_wifi_address").value, dashboard_port: Number($("cfg_dashboard_port").value) || 8765 };
+    $("cfgMsg").textContent = "Saving…";
+    api("POST", "/api/config", body).then(function (c) { S.config = c; render(); fillSettings(); $("cfgMsg").textContent = "Saved."; toast("Settings saved"); loadMapping(); })
+      .catch(function (e) { $("cfgMsg").textContent = e.message; toast(e.message, true); });
+  });
+  $("trashBtn").addEventListener("click", function () {
+    var box = $("trashBox"); if (!box.hidden) { box.hidden = true; return; }
+    api("GET", "/api/trash").then(function (d) {
+      $("trashDir").textContent = (d.dir || "") + " — " + (d.files || []).length + " files" + (d.truncated ? " (first 500)" : "");
+      $("trashList").innerHTML = (d.files || []).map(function (f) { return "<div class='line info'><span class=dim>" + esc(fmtBytes(f.size)) + "</span><span class=mono>" + esc(f.path) + "</span></div>"; }).join("") || "<div class=empty>Trash is empty.</div>";
+      box.hidden = false;
+    }).catch(function (e) { toast(e.message, true); });
+  });
+
+  // ---- health ---------------------------------------------------------------
+  function loadHealth() {
+    api("GET", "/api/health").then(function (h) {
+      var b = $("hlBadge"); b.textContent = h.worst === "ok" ? "all good" : h.worst; b.className = "badge " + (h.worst === "ok" ? "zero" : "");
+      $("healthRows").innerHTML = h.rows.map(function (r) {
+        var c = r.status === "ok" ? "ok" : r.status === "warn" ? "warn" : "bad";
+        return '<div class="row"><span class="dot ' + c + '"></span><b>' + esc(r.name) + '</b> <span class="muted">' + esc(r.detail) + '</span>' +
+          (r.status !== "ok" && r.fix ? '<div class="muted small">→ ' + esc(r.fix) + '</div>' : '') + '</div>';
+      }).join("");
+    }).catch(function () { $("healthRows").textContent = "Could not read health."; });
+  }
+  $("health").addEventListener("toggle", function () { if ($("health").open) loadHealth(); });
+  setTimeout(loadHealth, 1500);
+
+  // ---- actions -------------------------------------------------------------
+  document.querySelectorAll(".actions button").forEach(function (b) { b.addEventListener("click", function () {
+    var body = { kind: b.dataset.kind, dry_run: $("dryRun").checked, link: $("linkSel").value };
+    if (body.kind === "restore-all" && b.dataset.armed !== "1") { var sm = b.querySelector("small"), was = sm.textContent; b.dataset.armed = "1"; sm.textContent = "tap again: this writes to the phone"; setTimeout(function () { b.dataset.armed = ""; sm.textContent = was; }, 6000); return; }
+    document.querySelectorAll(".actions button").forEach(function (x) { x.disabled = true; });
+    S.feed = [];
+    api("POST", "/api/job", body).then(function () { S.busy = true; render(); })
+      .catch(function (e) { toast(e.message, true); S.busy = false; render(); });
+  }); });
+  $("stopBtn").addEventListener("click", function () { api("POST", "/api/cancel").then(function () { toast("Stopping after the current file"); }).catch(function (e) { toast(e.message, true); }); });
+  $("pauseBtn").addEventListener("click", function () { var on = !S.state.paused; api("POST", "/api/pause", { on: on }).then(function () { S.state.paused = on; render(); }).catch(function (e) { toast(e.message, true); }); });
+
+  // ---- review new albums ---------------------------------------------------
+  var RV = { albums: [], categories: [], newFolder: "_New from phone", loaded: {}, lb: null };
+  var LOOSE = "(loose files)";
+  function fmtDate(t) { if (!t) return ""; return new Date(num(t) * 1000).toLocaleDateString(); }
+  function rvAlbum(key) { for (var i = 0; i < RV.albums.length; i++) if (RV.albums[i].name === key) return RV.albums[i]; return null; }
+  function rvFiles(key) { var l = RV.loaded[key]; if (l) return l.files; var a = rvAlbum(key); return a ? (a.sample_files || []) : []; }
+  function rvCard(key) { var cards = $("rvList").querySelectorAll(".rv-album"); for (var i = 0; i < cards.length; i++) if (cards[i].dataset.album === key) return cards[i]; return null; }
+  function thumbHtml(f, i, selected) {
+    return "<button type=button class='rv-th" + (selected ? " sel" : "") + "' data-i='" + i + "' data-rel=\"" + esc(f.rel) + "\" aria-label=\"" + esc(f.name) + "\" title=\"" + esc(f.name) + "\">" +
+      "<img loading=\"lazy\" decoding=\"async\" src=\"/thumb?rel=" + encodeURIComponent(f.rel) + "\" alt=\"\">" + (f.is_video ? "<span class=play></span>" : "") + "</button>";
+  }
+  function loadReview() {
+    return api("GET", "/api/review").then(function (d) {
+      RV.albums = d.albums || []; RV.categories = d.categories || []; RV.newFolder = d.new_folder || RV.newFolder;
+      Object.keys(RV.loaded).forEach(function (k) { if (!rvAlbum(k)) delete RV.loaded[k]; });
+      renderReview();
+    }).catch(function () {});
+  }
+  function renderReview() {
+    var n = RV.albums.length, badge = $("rvBadge");
+    badge.textContent = n; badge.classList.toggle("zero", !n);
+    $("rvEmpty").hidden = n > 0;
+    var opts = "<option value=''>Pick a folder…</option><option value=\"" + esc(RV.newFolder) + "\">keep as new album (rename)</option>" +
+      RV.categories.map(function (c) { return "<option value=\"" + esc(c) + "\">" + esc(c) + "</option>"; }).join("");
+    // keep what you typed in cards that are still there
+    var keep = {};
+    $("rvList").querySelectorAll(".rv-album").forEach(function (c) {
+      keep[c.dataset.album] = { cat: c.querySelector(".rv-cat").value, name: c.querySelector(".rv-name").value, merge: c.querySelector(".rv-merge").checked,
+        selecting: c.classList.contains("selecting"), sel: Array.prototype.map.call(c.querySelectorAll(".rv-th.sel"), function (t) { return t.dataset.rel; }) };
+    });
+    $("rvList").innerHTML = RV.albums.map(function (a) {
+      var k = keep[a.name] || {}, selSet = {}; (k.sel || []).forEach(function (r) { selSet[r] = 1; });
+      var files = rvFiles(a.name), loaded = RV.loaded[a.name];
+      return "<div class='rv-album" + (k.selecting ? " selecting" : "") + "' data-album=\"" + esc(a.name) + "\">" +
+        "<div class=rv-head><b>" + esc(a.name) + "</b><span class='small muted'>" + num(a.files) + " file" + (a.files === 1 ? "" : "s") + " · " + fmtBytes(a.bytes) +
+          (a.newest_mtime ? " · newest " + esc(fmtDate(a.newest_mtime)) : "") + "</span></div>" +
+        "<div class=rv-grid>" + files.map(function (f, i) { return thumbHtml(f, i, selSet[f.rel]); }).join("") + "</div>" +
+        (files.length < num(a.files) ? "<button type=button data-more=\"" + esc(a.name) + "\">" + (loaded ? "Load more (" + files.length + " of " + a.files + ")" : "Show all " + a.files + " files") + "</button>" : "") +
+        "<div class=rv-form>" +
+          "<select class=rv-cat aria-label='Folder'>" + opts + "</select>" +
+          "<input type=text class=rv-name autocomplete=off placeholder=\"" + (a.loose ? "folder name (required)" : "rename to (optional)") + "\">" +
+          "<div class=rv-btns>" +
+            "<label class=switch><input type=checkbox class=rv-merge" + (k.merge ? " checked" : "") + "><span class=small>Merge if exists</span></label>" +
+            "<button type=button class='primary only-norm' data-file=\"" + esc(a.name) + "\">File it</button>" +
+            "<button type=button class=only-norm data-select=\"" + esc(a.name) + "\">Select files</button>" +
+            "<button type=button class='primary only-sel' data-filesel=\"" + esc(a.name) + "\">File selected (" + (k.sel || []).length + ")</button>" +
+            "<button type=button class=only-sel data-cancelsel=\"" + esc(a.name) + "\">Cancel</button>" +
+          "</div></div></div>";
+    }).join("");
+    $("rvList").querySelectorAll(".rv-album").forEach(function (c) { var k = keep[c.dataset.album]; if (!k) return;
+      c.querySelector(".rv-cat").value = k.cat || ""; c.querySelector(".rv-name").value = k.name || ""; });
+  }
+  function rvRedrawGrid(card) {
+    var key = card.dataset.album, files = rvFiles(key), a = rvAlbum(key) || {}, selSet = {};
+    card.querySelectorAll(".rv-th.sel").forEach(function (t) { selSet[t.dataset.rel] = 1; });
+    card.querySelector(".rv-grid").innerHTML = files.map(function (f, i) { return thumbHtml(f, i, selSet[f.rel]); }).join("");
+    var more = card.querySelector("[data-more]");
+    if (files.length >= num(a.files)) { if (more) more.remove(); }
+    else if (more) more.textContent = "Load more (" + files.length + " of " + a.files + ")";
+    rvSelCount(card);
+  }
+  function rvSelCount(card) { var n = card.querySelectorAll(".rv-th.sel").length, b = card.querySelector("[data-filesel]"); if (b && b.dataset.armed !== "1") b.textContent = "File selected (" + n + ")"; }
+  function rvArm(b, label, reset) {
+    if (b.dataset.armed === "1") { b.dataset.armed = ""; b.textContent = reset; return true; }
+    b.dataset.armed = "1"; b.textContent = label;
+    setTimeout(function () { if (b.dataset.armed === "1") { b.dataset.armed = ""; b.textContent = reset; } }, 5000);
+    return false;
+  }
+  function rvMove(card, key, rels) {
+    var a = rvAlbum(key) || {}, cat = card.querySelector(".rv-cat").value, name = card.querySelector(".rv-name").value.trim(), merge = card.querySelector(".rv-merge").checked;
+    if (!cat) { toast("Pick a folder first", true); card.querySelector(".rv-cat").focus(); return; }
+    if (cat === RV.newFolder && !name && !rels) { toast("Type a new name to keep it as a new album", true); card.querySelector(".rv-name").focus(); return; }
+    if (a.loose && !name) { toast("Loose files need a folder name", true); card.querySelector(".rv-name").focus(); return; }
+    var body = { album: key, category: cat, new_name: name || null, merge: merge };
+    if (rels) body.files = rels;
+    card.querySelectorAll("button").forEach(function (x) { x.disabled = true; });
+    api("POST", rels ? "/api/review/move-files" : "/api/review/move", body).then(function (d) {
+      toast("Filed " + (rels ? d.moved + " files" : "“" + key + "”") + " → " + (d.rel || cat) + (d.merged ? " (merged)" : ""), false, d.run_id);
+      delete RV.loaded[key];
+      return loadReview().then(function () { return loadState().then(loadMapping); });
+    }).catch(function (e) { toast(e.message, true); card.querySelectorAll("button").forEach(function (x) { x.disabled = false; }); });
+  }
+  $("rvList").addEventListener("click", function (ev) {
+    var b = ev.target.closest("button"); if (!b) return;
+    var card = b.closest(".rv-album"); if (!card) return;
+    var key = card.dataset.album;
+    if (b.classList.contains("rv-th")) {
+      if (card.classList.contains("selecting")) { b.classList.toggle("sel"); rvSelCount(card); }
+      else openLightbox(key, Number(b.dataset.i) || 0);
+    } else if (b.dataset.more != null) {
+      var have = RV.loaded[key] ? RV.loaded[key].files.length : 0;
+      b.disabled = true; b.textContent = "Loading…";
+      api("GET", "/api/review/files?album=" + encodeURIComponent(key) + "&offset=" + have + "&limit=60").then(function (d) {
+        var l = RV.loaded[key] || (RV.loaded[key] = { files: [], total: d.total });
+        l.files = l.files.concat(d.files || []); l.total = d.total;
+        rvRedrawGrid(card);
+      }).catch(function (e) { toast(e.message, true); b.disabled = false; b.textContent = "Show all files"; });
+    } else if (b.dataset.select != null) { card.classList.add("selecting"); rvSelCount(card); }
+    else if (b.dataset.cancelsel != null) { card.classList.remove("selecting"); card.querySelectorAll(".rv-th.sel").forEach(function (t) { t.classList.remove("sel"); }); rvSelCount(card); }
+    else if (b.dataset.file != null) { if (rvArm(b, "Really file it?", "File it")) rvMove(card, key, null); }
+    else if (b.dataset.filesel != null) {
+      var rels = Array.prototype.map.call(card.querySelectorAll(".rv-th.sel"), function (t) { return t.dataset.rel; });
+      if (!rels.length) { toast("Tap the pictures you want to file first", true); return; }
+      if (rvArm(b, "Really file " + rels.length + "?", "File selected (" + rels.length + ")")) rvMove(card, key, rels);
+    }
+  });
+
+  // ---- lightbox --------------------------------------------------------------
+  function openLightbox(key, i) { RV.lb = { key: key, i: i }; $("lb").hidden = false; showLb(); }
+  function closeLightbox() { RV.lb = null; $("lb").hidden = true; $("lbStage").innerHTML = ""; }
+  function showLb() {
+    if (!RV.lb) return;
+    var files = rvFiles(RV.lb.key), f = files[RV.lb.i]; if (!f) { closeLightbox(); return; }
+    var src = "/file?rel=" + encodeURIComponent(f.rel);
+    $("lbName").textContent = f.name + " · " + fmtBytes(f.size) + (f.mtime ? " · " + fmtDate(f.mtime) : "");
+    $("lbCount").textContent = (RV.lb.i + 1) + " / " + files.length;
+    $("lbStage").innerHTML = f.is_video ? "<video controls autoplay playsinline preload=metadata src=\"" + src + "\"></video>" : "<img src=\"" + src + "\" alt=\"" + esc(f.name) + "\">";
+    $("lbPrev").disabled = RV.lb.i <= 0; $("lbNext").disabled = RV.lb.i >= files.length - 1;
+  }
+  function lbStep(d) { if (!RV.lb) return; var n = rvFiles(RV.lb.key).length, j = RV.lb.i + d; if (j < 0 || j >= n) return; RV.lb.i = j; showLb(); }
+  $("lbClose").addEventListener("click", closeLightbox);
+  $("lbPrev").addEventListener("click", function () { lbStep(-1); });
+  $("lbNext").addEventListener("click", function () { lbStep(1); });
+  $("lbStage").addEventListener("click", function (ev) { if (ev.target === ev.currentTarget) closeLightbox(); });
+  document.addEventListener("keydown", function (ev) { if ($("lb").hidden) return;
+    if (ev.key === "Escape") closeLightbox(); else if (ev.key === "ArrowLeft") lbStep(-1); else if (ev.key === "ArrowRight") lbStep(1); });
+  (function () { var x0 = null; $("lbStage").addEventListener("touchstart", function (e) { x0 = e.touches[0].clientX; }, { passive: true });
+    $("lbStage").addEventListener("touchend", function (e) { if (x0 == null) return; var dx = e.changedTouches[0].clientX - x0; x0 = null; if (Math.abs(dx) > 50) lbStep(dx < 0 ? 1 : -1); }, { passive: true }); })();
+
+  // ---- live feed: SSE with polling fallback ---------------------------------
+  var es = null, pollT = null, linkT = null, reconnectT = null;
+  function onEvent(e) {
+    if (e.type === "state") { mergeState(e); if (e.albums && typeof e.albums === "object") S.state.albums = e.albums; }
+    else if (e.type === "job") { S.busy = !!e.running; if (!e.running) { loadState().then(loadMapping); loadReview(); } }
+    else pushFeed(e);
+    render();
+  }
+  function startPolling() { if (pollT) return; pollT = setInterval(function () { loadState().catch(function () {}); }, 2000); }
+  function stopPolling() { clearInterval(pollT); pollT = null; }
+  function connect() {
+    if (!window.EventSource) { startPolling(); return; }
+    try { es = new EventSource("/events"); } catch (e) { startPolling(); return; }
+    es.onopen = function () { stopPolling(); clearTimeout(reconnectT); };
+    es.onmessage = function (m) { try { onEvent(JSON.parse(m.data)); } catch (e) {} };
+    es.onerror = function () { try { es.close(); } catch (e) {} es = null; startPolling(); clearTimeout(reconnectT); reconnectT = setTimeout(connect, 5000); };
+  }
+  function pollLink() { if (isRunning()) return; api("GET", "/api/state").then(function (d) { S.link = d.link || {}; S.runs = d.runs || []; S.config = d.config || {}; S.busy = !!d.busy; render(); renderRuns(); fillSettings(); }).catch(function () {}); }
+
+  // The SSE stream paints progress at once; /api/state (link probe, runs, config) may take seconds when adb hunts for a Wi-Fi phone.
+  connect();
+  loadState().catch(function (e) { toast("Cannot reach the server: " + e.message, true); });
+  loadMapping();
+  loadReview();
+  linkT = setInterval(pollLink, 10000);
+})();
+</script>
+</body>
+</html>

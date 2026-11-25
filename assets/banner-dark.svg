@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 320" role="img" aria-label="PhoneVault. Back up your Android phone to your own PC. No root. Undo any run.">
+<rect width="1200" height="320" fill="#1B1A17"/>
+<g fill="none" stroke="#FAF6EF" stroke-width="5">
+<rect x="70" y="52" width="122" height="216" rx="20"/><path d="M114 250h34"/>
+<path d="M368 84h66l22 26h118a10 10 0 0 1 10 10v128a10 10 0 0 1-10 10H368a10 10 0 0 1-10-10V94a10 10 0 0 1 10-10z"/>
+</g>
+<g fill="#4A463E"><rect x="88" y="76" width="38" height="38" rx="5"/><rect x="136" y="76" width="38" height="38" rx="5"/><rect x="88" y="124" width="38" height="38" rx="5"/><rect x="136" y="172" width="38" height="38" rx="5"/>
+<rect x="384" y="136" width="44" height="44" rx="5"/><rect x="442" y="136" width="44" height="44" rx="5"/><rect x="384" y="194" width="44" height="44" rx="5"/><rect x="500" y="194" width="44" height="44" rx="5"/></g>
+<g fill="#CC2027"><rect x="136" y="124" width="38" height="38" rx="5"/><rect x="88" y="172" width="38" height="38" rx="5"/><rect x="500" y="136" width="44" height="44" rx="5"/><rect x="442" y="194" width="44" height="44" rx="5"/></g>
+<g fill="none" stroke="#FAF6EF" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"><path d="M222 136h92M296 118l20 18-20 18"/></g>
+<g fill="none" stroke="#CC2027" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"><path d="M316 196h-92M242 178l-20 18 20 18"/></g>
+<g font-family="Segoe UI, Helvetica, Arial, sans-serif" fill="#FAF6EF"><text x="650" y="142" font-size="76" font-weight="700" letter-spacing="-2">PhoneVault</text>
+<text x="653" y="196" font-size="28">Your Android phone, on your own PC.</text>
+<text x="653" y="240" font-size="28">No root. <tspan fill="#CC2027" font-weight="700">Undo any run.</tspan></text></g>
+</svg>

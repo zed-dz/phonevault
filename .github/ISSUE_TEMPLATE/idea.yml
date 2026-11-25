@@ -1,0 +1,7 @@
+name: Idea
+description: Something PhoneVault should do
+labels: [enhancement]
+body:
+  - type: textarea
+    attributes: {label: What you want to do, description: The task, not the solution}
+    validations: {required: true}

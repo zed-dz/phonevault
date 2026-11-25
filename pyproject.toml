@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "phonevault"
+dynamic = ["version"]
+description = "Back up an Android phone to your own PC. No root. Undo any backup run."
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Amine Hammou" }]
+keywords = ["android", "backup", "adb", "mtp", "contacts", "sms", "apk", "no-root"]
+dependencies = ["rich>=13", "fastapi>=0.110", "uvicorn>=0.29", "python-multipart>=0.0.18", "pillow>=10.3"]
+
+[project.optional-dependencies]
+test = ["pytest>=8", "httpx>=0.27"]
+
+[project.urls]
+Homepage = "https://aminehammou.vercel.app/tools/phonevault.html"
+Source = "https://github.com/zed-dz/phonevault"
+
+[project.scripts]
+phonevault = "phonevault.cli:main"
+
+[tool.setuptools.dynamic]
+version = { attr = "phonevault.__version__" }
+
+[tool.setuptools.packages.find]
+include = ["phonevault*"]
+
+[tool.setuptools.package-data]
+phonevault = ["server/static/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

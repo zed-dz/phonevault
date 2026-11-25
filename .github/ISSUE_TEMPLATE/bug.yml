@@ -1,0 +1,15 @@
+name: Something went wrong
+description: A backup, undo or dashboard problem
+labels: [bug]
+body:
+  - type: textarea
+    attributes: {label: What happened, description: What you did, what you expected, what you saw}
+    validations: {required: true}
+  - type: input
+    attributes: {label: Phone and Android version, placeholder: "Example X1, Android 14"}
+  - type: dropdown
+    attributes: {label: Link, options: [USB adb, Wi-Fi adb, MTP, no phone (demo)]}
+  - type: input
+    attributes: {label: "PC and PhoneVault version", placeholder: "Windows 11, phonevault 0.9.0"}
+  - type: textarea
+    attributes: {label: Output of phonevault status, description: "Remove serial numbers, addresses and names you want to keep private", render: text}
