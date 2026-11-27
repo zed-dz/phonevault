@@ -1,14 +1,18 @@
-"""Contacts, SMS and call log over adb's content provider. No root, no app.
+"""Back up contacts, messages, call logs and calendars over adb.
 
-Saved as JSON (full rows) + contacts.vcf (import on any phone) + sms.xml in the
-"SMS Backup & Restore" shape, which most restore apps read.
+Save JSON plus importable contacts.vcf, sms.xml and calendar.ics exports.
+LATEST-calendar.txt points to the last snapshot with a usable calendar export.
 """
 from __future__ import annotations
 
 import json
 import re
 import time
+from collections.abc import Iterator
+from datetime import UTC, datetime, timedelta
+from itertools import count
 from pathlib import Path
+from uuid import NAMESPACE_URL, uuid5
 from xml.sax.saxutils import escape
 
 from ..core.engine import Engine
@@ -158,6 +162,74 @@ def calls(adb: AdbTransport) -> list[dict[str, str]]:
     return query(adb, "content://call_log/calls", "_id:number:date:duration:type:name:countryiso", "date ASC")
 
 
+def calendar(adb: AdbTransport) -> list[dict[str, str]]:
+    rows = query(adb, "content://com.android.calendar/events",
+                 "_id:calendar_id:dtstart:dtend:duration:allDay:eventTimezone:"
+                 "rrule:rdate:exrule:exdate:original_id:originalInstanceTime:originalAllDay:"
+                 "deleted:title:description:eventLocation", "dtstart ASC")
+    return [row for row in rows if row.get("_id") not in (None, "", "NULL") and row.get("deleted") != "1"]
+
+
+def _calendar_time(value: str) -> datetime | None:
+    try:
+        return datetime(1970, 1, 1, tzinfo=UTC) + timedelta(seconds=int(value) // 1000)
+    except (ValueError, OverflowError):
+        return None
+
+
+def _ics_text(value: str) -> str:
+    value = value.replace("\r\n", "\n").replace("\r", "\n")
+    value = re.sub(r"[\x00-\x08\x0b-\x1f\x7f]", "", value)
+    return value.replace("\\", "\\\\").replace("\n", "\\n").replace(",", "\\,").replace(";", "\\;")
+
+
+def _ics_fold(line: str) -> Iterator[bytes]:
+    part = bytearray()
+    for char in line:
+        encoded = char.encode("utf-8")
+        if len(part) + len(encoded) > 75:
+            yield bytes(part)
+            part = bytearray(b" ")
+        part.extend(encoded)
+    yield bytes(part)
+
+
+def to_ics(rows: list[dict[str, str]], serial: str) -> bytes:
+    """Export one event per usable row. Recurrence data is kept in the JSON export."""
+    events = []
+    dtstamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+    for row in rows:
+        start = _calendar_time(row.get("dtstart", ""))
+        if start is None:
+            continue
+        end = _calendar_time(row.get("dtend", ""))
+        all_day = row.get("allDay") == "1"
+        fmt = "%m%d" if all_day else "%m%dT%H%M%SZ"
+        param = ";VALUE=DATE" if all_day else ""
+        uid = uuid5(NAMESPACE_URL, f"phonevault:{serial}:{row['_id']}")
+        events.extend(("BEGIN:VEVENT", f"UID:{uid}", f"DTSTAMP:{dtstamp}", f"DTSTART{param}:{start.year:04d}{start:{fmt}}"))
+        if end is not None and (end.date() > start.date() if all_day else end > start):
+            events.append(f"DTEND{param}:{end.year:04d}{end:{fmt}}")
+        else:
+            duration = row.get("duration", "")
+            match = re.fullmatch(
+                r"P(?:([0-9]+W)|([0-9]+D)?T?((?:[0-9]+H)?(?:[0-9]+M)?(?:[0-9]+S)?))", duration
+            )
+            if match and any(digit in "123456789" for digit in duration):
+                weeks, days, clock = match.groups("")
+                if not all_day or not clock:
+                    events.append(f"DURATION:P{weeks or days}{'T' + clock if clock else ''}")
+        for column, prop in (("title", "SUMMARY"), ("description", "DESCRIPTION"), ("eventLocation", "LOCATION")):
+            value = row.get(column)
+            if value not in (None, "", "NULL"):
+                events.append(f"{prop}:{_ics_text(value)}")
+        events.append("END:VEVENT")
+    if not events:
+        return b""
+    lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//PhoneVault//Calendar Backup//EN", *events, "END:VCALENDAR"]
+    return b"\r\n".join(part for line in lines for part in _ics_fold(line)) + b"\r\n"
+
+
 def _vcf(v: str) -> str:
     """vCard 3.0 text: no raw line breaks, so one contact cannot write lines of its own."""
     return str(v).replace("\\", "\\\\").replace("\r", "").replace("\n", "\\n")
@@ -202,15 +274,20 @@ def to_sms_xml(messages: list[dict[str, str]]) -> str:
 def backup_pim(engine: Engine, adb: AdbTransport) -> dict:
     ev = engine.events
     ev.reset("pim", adb.describe())
-    ev.set(phase="copying", total_files=4, message="Reading contacts, SMS, MMS, call log")
-    root = engine.cfg.root / engine.cfg.pim_subfolder
+    jobs = (("contacts", contacts), ("sms", sms), ("mms", mms), ("calls", calls), ("calendar", calendar))
+    ev.set(phase="copying", total_files=len(jobs), message="Reading contacts, SMS, MMS, call log and calendar")
+    engine.ready_to_write()
+    root = engine.safe_dir(engine.cfg.root / engine.cfg.pim_subfolder)
     stamp = time.strftime("%Y%m%d-%H%M%S")
     out_dir = root / stamp
-    engine.ready_to_write()
-    engine.safe_dir(out_dir)
+    for suffix in count(1):
+        try:
+            out_dir.mkdir()
+            break
+        except FileExistsError:
+            out_dir = root / f"{stamp}-{suffix}"
     rid = engine.journal.start_run("pim", note=str(out_dir))
     result: dict = {"dir": str(out_dir), "counts": {}, "errors": {}}
-    jobs = (("contacts", contacts), ("sms", sms), ("mms", mms), ("calls", calls))
     for n, (name, fn) in enumerate(jobs, 1):
         ev.set(current=name, done_files=n - 1)
         try:
@@ -218,7 +295,8 @@ def backup_pim(engine: Engine, adb: AdbTransport) -> dict:
             p = out_dir / f"{name}.json"
             p.write_text(json.dumps(data, indent=1, ensure_ascii=False), encoding="utf-8")
             engine.journal.record(rid, "copy", f"content://{name}", str(p), p.stat().st_size)
-            result["counts"][name] = len(data)
+            if name != "calendar":
+                result["counts"][name] = len(data)
             if name == "contacts":
                 v = out_dir / "contacts.vcf"
                 v.write_text(to_vcf(data), encoding="utf-8")
@@ -227,6 +305,18 @@ def backup_pim(engine: Engine, adb: AdbTransport) -> dict:
                 x = out_dir / "sms.xml"
                 x.write_text(to_sms_xml(data), encoding="utf-8")
                 engine.journal.record(rid, "copy", "sms.xml", str(x), x.stat().st_size)
+            if name == "calendar":
+                ics = to_ics(data, getattr(adb, "serial", ""))
+                if ics:
+                    export = out_dir / "calendar.ics"
+                    export.write_bytes(ics)
+                    engine.journal.record(rid, "copy", "calendar.ics", str(export), len(ics))
+                    marker = root / "LATEST-calendar.txt"
+                    engine.journal.guard(marker)
+                    pending = out_dir / ".calendar-latest"
+                    pending.write_text(out_dir.name, encoding="utf-8")
+                    pending.replace(marker)
+                result["counts"][name] = len(data)
             ev.emit("file_done", path=name, status="ok", dst=str(p), album="pim")
         except Exception as e:  # noqa: BLE001
             result["errors"][name] = str(e)
@@ -234,12 +324,12 @@ def backup_pim(engine: Engine, adb: AdbTransport) -> dict:
             ev.emit("file_failed", path=name, error=str(e), album="pim")
     c = result["counts"]
     if c.get("contacts", 0) > 0 or c.get("sms", 0) > 0:
-        (root / "LATEST.txt").write_text(stamp, encoding="utf-8")   # an empty read never replaces a good one (some phones block the call log)
+        (root / "LATEST.txt").write_text(out_dir.name, encoding="utf-8")   # an empty read never replaces a good one
     else:
-        engine.events.log_line("Nothing read from the phone: LATEST.txt left pointing at the last good save", "warn")
+        engine.events.log_line("No contacts or SMS read, so LATEST.txt still points at the last good save", "warn")
     engine.journal.finish_run(rid, "done" if sum(c.values()) > 0 else "failed")
-    ev.set(phase="done", finished=time.time(), done_files=4, current="", run_id=rid,
-           message=f"{c.get('contacts', 0)} contacts, {c.get('sms', 0)} SMS, {c.get('mms', 0)} MMS, {c.get('calls', 0)} calls saved"
+    ev.set(phase="done", finished=time.time(), done_files=len(jobs), current="", run_id=rid,
+           message=f"{c.get('contacts', 0)} contacts, {c.get('sms', 0)} SMS, {c.get('mms', 0)} MMS, {c.get('calls', 0)} calls, {c.get('calendar', 0)} calendar events saved"
                    + (f" (blocked: {', '.join(result['errors'])})" if result["errors"] else ""))
     ev.emit("run_done", run_id=rid, status="done")
     result["run_id"] = rid
